@@ -1,16 +1,18 @@
 import { API, DynamicPlatformPlugin, Logger, PlatformAccessory, PlatformConfig, Service, Characteristic } from 'homebridge';
 
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
-import { ExamplePlatformAccessory } from './platformAccessory';
+import { ChimeAccessory } from './chimeAccessory';
 
-/**
- * HomebridgePlatform
- * This class is the main constructor for your plugin, this is where you should
- * parse the user config and discover/register accessories with Homebridge.
- */
-export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
+const request = require('request');
+const util = require('util');
+const requestPromise = util.promisify(request);
+
+ export class HomebridgeUnifiProtectChimes implements DynamicPlatformPlugin {
   public readonly Service: typeof Service = this.api.hap.Service;
   public readonly Characteristic: typeof Characteristic = this.api.hap.Characteristic;
+
+  private csrfToken: string = '';
+  private cookie: string = '';
 
   // this is used to track restored cached accessories
   public readonly accessories: PlatformAccessory[] = [];
@@ -20,95 +22,79 @@ export class ExampleHomebridgePlatform implements DynamicPlatformPlugin {
     public readonly config: PlatformConfig,
     public readonly api: API,
   ) {
-    this.log.debug('Finished initializing platform:', this.config.name);
-
-    // When this event is fired it means Homebridge has restored all cached accessories from disk.
-    // Dynamic Platform plugins should only register new accessories after this event was fired,
-    // in order to ensure they weren't added to homebridge already. This event can also be used
-    // to start discovery of new accessories.
+    this.log.debug('Finished initializing platform:', this.config);
     this.api.on('didFinishLaunching', () => {
-      log.debug('Executed didFinishLaunching callback');
-      // run the method to discover / register your devices as accessories
       this.discoverDevices();
     });
   }
 
-  /**
-   * This function is invoked when homebridge restores cached accessories from disk at startup.
-   * It should be used to setup event handlers for characteristics and update respective values.
-   */
   configureAccessory(accessory: PlatformAccessory) {
     this.log.info('Loading accessory from cache:', accessory.displayName);
-
-    // add the restored accessory to the accessories cache so we can track if it has already been registered
     this.accessories.push(accessory);
   }
 
-  /**
-   * This is an example method showing how to register discovered accessories.
-   * Accessories must only be registered once, previously created accessories
-   * must not be registered again to prevent "duplicate UUID" errors.
-   */
-  discoverDevices() {
+  async login() {
+    if (this.csrfToken && this.cookie) {
+      return true;
+    }
+    const json = { username: this.config.username, password: this.config.password };
+    const response = await requestPromise({ uri: `${this.config.nvrAddress}/api/auth/login`, method: 'POST', json: json,
+      rejectUnauthorized: false, requestCert: false, resolveWithFullResponse: true });
 
-    // EXAMPLE ONLY
-    // A real plugin you would discover accessories from the local network, cloud services
-    // or a user-defined array in the platform config.
-    const exampleDevices = [
-      {
-        exampleUniqueId: 'ABCD',
-        exampleDisplayName: 'Bedroom',
-      },
-      {
-        exampleUniqueId: 'EFGH',
-        exampleDisplayName: 'Kitchen',
-      },
-    ];
+    // TODO: add error handling
+    this.csrfToken = response.headers['x-csrf-token'];
+    this.cookie = response.headers['set-cookie'];
+  }
 
-    // loop over the discovered devices and register each one if it has not already been registered
-    for (const device of exampleDevices) {
+  async chimes() {
+    await this.login();
+    const response = await requestPromise({ uri: `${this.config.nvrAddress}/proxy/protect/api/chimes`, method: 'GET',
+      headers: { 'cookie': this.cookie, 'x-csrf-token': this.csrfToken },
+      rejectUnauthorized: false, requestCert: false, resolveWithFullResponse: true });
 
-      // generate a unique id for the accessory this should be generated from
-      // something globally unique, but constant, for example, the device serial
-      // number or MAC address
-      const uuid = this.api.hap.uuid.generate(device.exampleUniqueId);
+    // TODO: error handling
 
-      // see if an accessory with the same uuid has already been registered and restored from
-      // the cached devices we stored in the `configureAccessory` method above
+    this.log.debug('chimes response', response.body);
+    this.log.debug('chimes response', JSON.parse(response.body));
+    return JSON.parse(response.body);
+  }
+
+  async chimeSetVolume(id, value) {
+    await this.login();
+    const json = { volume: parseInt(value) };
+    const response = await requestPromise({ uri: `${this.config.nvrAddress}/proxy/protect/api/chimes/${id}`, method: 'PATCH',
+      headers: { 'cookie': this.cookie, 'x-csrf-token': this.csrfToken }, json: json,
+      rejectUnauthorized: false, requestCert: false, resolveWithFullResponse: true });
+    // TODO: error handling
+  }
+
+  async chimeGetVolume(id) {
+    await this.login();
+
+    const response = await requestPromise({ uri: `${this.config.nvrAddress}/proxy/protect/api/chimes/${id}`, method: 'GET',
+      headers: { 'cookie': this.cookie, 'x-csrf-token': this.csrfToken },
+      rejectUnauthorized: false, requestCert: false, resolveWithFullResponse: true });
+
+    // TODO: error handling
+    return parseInt(JSON.parse(response.body).volume);
+  }
+
+  async discoverDevices() {
+    const chimes = await this.chimes();
+    for( const chime of chimes) {
+      const uuid = this.api.hap.uuid.generate('chime_' + chime.id);
       const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
-
       if (existingAccessory) {
-        // the accessory already exists
         this.log.info('Restoring existing accessory from cache:', existingAccessory.displayName);
-
-        // if you need to update the accessory.context then you should run `api.updatePlatformAccessories`. eg.:
-        // existingAccessory.context.device = device;
-        // this.api.updatePlatformAccessories([existingAccessory]);
-
-        // create the accessory handler for the restored accessory
-        // this is imported from `platformAccessory.ts`
-        new ExamplePlatformAccessory(this, existingAccessory);
-
-        // it is possible to remove platform accessories at any time using `api.unregisterPlatformAccessories`, eg.:
-        // remove platform accessories when no longer present
+        this.api.updatePlatformAccessories([existingAccessory]);
+        new ChimeAccessory(this, existingAccessory);
         // this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
-        // this.log.info('Removing existing accessory from cache:', existingAccessory.displayName);
+        // this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [existingAccessory]);
       } else {
-        // the accessory does not yet exist, so we need to create it
-        this.log.info('Adding new accessory:', device.exampleDisplayName);
-
-        // create a new accessory
-        const accessory = new this.api.platformAccessory(device.exampleDisplayName, uuid);
-
-        // store a copy of the device object in the `accessory.context`
-        // the `context` property can be used to store any data about the accessory you may need
-        accessory.context.device = device;
-
-        // create the accessory handler for the newly create accessory
-        // this is imported from `platformAccessory.ts`
-        new ExamplePlatformAccessory(this, accessory);
-
-        // link the accessory to your platform
+        this.log.info('Adding new accessory:', chime.name);
+        const accessory = new this.api.platformAccessory(chime.name, uuid);
+        accessory.context.device = chime;
+        new ChimeAccessory(this, accessory);
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
       }
     }
