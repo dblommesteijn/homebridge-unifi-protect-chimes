@@ -19,6 +19,7 @@
     "comma-dangle": ["warn", "always-multiline"],
     "dot-notation": "off",
     "eqeqeq": "off",
+    "null": "off",
     "curly": ["warn", "all"],
     "brace-style": ["warn"],
     "prefer-arrow-callback": ["warn"],
