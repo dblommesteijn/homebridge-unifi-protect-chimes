@@ -2,7 +2,7 @@
   "private": true,
   "displayName": "Homebridge Unifi Protect Chimes",
   "name": "homebridge-unifi-protect-chimes",
-  "version": "0.0.1a",
+  "version": "0.0.1b",
   "description": "This plugin exposes volume control for UP Chimes from Unifi Protect",
   "license": "Apache-2.0",
   "repository": {

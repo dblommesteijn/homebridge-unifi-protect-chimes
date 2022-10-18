@@ -1,6 +1,4 @@
-import { access } from 'fs';
 import { Service, PlatformAccessory, CharacteristicValue } from 'homebridge';
-
 import { HomebridgeUnifiProtectChimes } from './platform';
 
 /**
@@ -10,11 +8,11 @@ import { HomebridgeUnifiProtectChimes } from './platform';
  */
 export class ChimeAccessory {
   private service: Service;
-  private lastKnownVolume: number = 0;
+  private lastKnownVolume = 0;
 
   constructor(
     private readonly platform: HomebridgeUnifiProtectChimes,
-    private readonly accessory: PlatformAccessory
+    private readonly accessory: PlatformAccessory,
   ) {
     // set accessory information
     this.accessory.getService(this.platform.Service.AccessoryInformation)!
@@ -35,7 +33,7 @@ export class ChimeAccessory {
 
   async setOn(value: CharacteristicValue) {
     const newValue = value ? this.lastKnownVolume : 0;
-    this.platform.chimeSetVolume(this.accessory.context.device.id, newValue);
+    this.platform.chimeSetVolume(this.accessory.context.device.id, newValue as number);
   }
 
   async getOn(): Promise<CharacteristicValue> {
@@ -47,7 +45,7 @@ export class ChimeAccessory {
   }
 
   async setBrightness(value: CharacteristicValue) {
-    this.platform.chimeSetVolume(this.accessory.context.device.id, value);
+    this.platform.chimeSetVolume(this.accessory.context.device.id, value as number);
     // force update on the current state
     this.service.getCharacteristic(this.platform.Characteristic.Brightness).updateValue(value);
     this.lastKnownVolume = value as number;
