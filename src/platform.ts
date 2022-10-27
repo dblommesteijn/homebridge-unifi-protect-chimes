@@ -13,7 +13,6 @@ export class HomebridgeUnifiProtectChimes implements DynamicPlatformPlugin {
 
   private csrfToken = '';
   private cookie = '';
-  private invalidCredentials = false;
   private loginAttempts = 0;
 
   // this is used to track restored cached accessories
@@ -36,12 +35,6 @@ export class HomebridgeUnifiProtectChimes implements DynamicPlatformPlugin {
   }
 
   async login() {
-    if (this.invalidCredentials) {
-      return false;
-    }
-    if (this.csrfToken && this.cookie) {
-      return true;
-    }
     this.loginAttempts++;
     const json = { username: this.config.username, password: this.config.password };
     const response = await requestPromise({ uri: `${this.config.nvrAddress}/api/auth/login`, method: 'POST', json: json,
@@ -53,24 +46,26 @@ export class HomebridgeUnifiProtectChimes implements DynamicPlatformPlugin {
       this.cookie = response.headers['set-cookie'];
     } else {
       this.log.error('Authorization failed', response.statusCode);
-      this.invalidCredentials = true;
+      this.clearAuthenticationAndSleepAfterTooManyAttempts();
+      return await this.login();
     }
   }
 
-  timeout(ms) {
+  timeout(ms: number) {
     return new Promise( resolve => setTimeout(resolve, ms));
   }
 
   async sleep(fn, ...args) {
-    await this.timeout(5000);
+    await this.timeout(1000);
     return fn(...args);
   }
 
   async clearAuthenticationAndSleepAfterTooManyAttempts() {
     this.cookie = '';
     this.csrfToken = '';
-    if(this.loginAttempts > 5) {
-      this.log.info('Login attempt surpassing 5, sleeping for 5 seconds..');
+    // wait before trying again
+    if(this.loginAttempts > 1) {
+      this.log.info('Login attempt surpassing 1, sleeping for 1 second..');
       await this.sleep(() => {
         this.log.debug('sleeping...');
       });
@@ -130,6 +125,11 @@ export class HomebridgeUnifiProtectChimes implements DynamicPlatformPlugin {
     const json = JSON.parse(response.body);
     this.log.info('Chime Get Volume: ', id, json.volume);
     return json.volume as number;
+  }
+
+  async playSpeaker(id) {
+    // TODO: POST TO /proxy/protect/api/chimes/:id/play-speaker
+
   }
 
   async discoverDevices() {
