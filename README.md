@@ -6,7 +6,7 @@
 
 # Homebridge Unifi Protect chimes
 
-This plugin exposes the Unifi-Protect chimes to homebridge.
+This plugin exposes the Unifi-Protect chimes to homebridge. On HomeKit there is a lack of control-types, so I opted to use the Light Brightness to represent the Volume of the Chime. The plugin supports zero or more chimes. Adding chimes works with auto-descovery via the Unifi Protect `proxy/protect/api/chimes` endpoint, basically when credentials and IP are correct, setup is automatic.
 
 ## Setup Development Environment
 
@@ -40,52 +40,3 @@ homebridge -D
 ```
 
 At this point the plugin should show up in your local Homebridge setup.
-
-
-## Watch For Changes and Build Automatically (not tested)
-
-If you want to have your code compile automatically as you make changes, and restart Homebridge automatically between changes, you first need to add your plugin as a platform in `~/.homebridge/config.json`:
-```
-{
-...
-    "platforms": [
-        {
-            "name": "Config",
-            "port": 8581,
-            "platform": "config"
-        },
-        {
-            "name": "<PLUGIN_NAME>",
-            //... any other options, as listed in config.schema.json ...
-            "platform": "<PLATFORM_NAME>"
-        }
-    ]
-}
-```
-
-and then you can run:
-
-```
-npm run watch
-```
-
-This will launch an instance of Homebridge in debug mode which will restart every time you make a change to the source code. It will load the config stored in the default location under `~/.homebridge`. You may need to stop other running instances of Homebridge while using this command to prevent conflicts. You can adjust the Homebridge startup command in the [`nodemon.json`](./nodemon.json) file.
-
-## Publish Package
-
-```
-npm publish
-```
-
-_NOTE: When you are ready to publish your plugin to [npm](https://www.npmjs.com/), make sure you have removed the `private` attribute from the [`package.json`](./package.json)_
-
-If you are publishing a scoped plugin, i.e. `@username/homebridge-xxx` you will need to add `--access=public` to command the first time you publish.
-
-**Publishing Beta Versions**
-
-```bash
-npm version prepatch --preid beta
-npm publish --tag=beta
-```
-
-_NOTE: Users can then install the  *beta* version by appending `@beta` to the install command_

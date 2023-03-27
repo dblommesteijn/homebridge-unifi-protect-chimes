@@ -18,7 +18,8 @@
       "nvrAddress": {
         "title": "NVR Address/ IP",
         "type": "string",
-        "required": true
+        "required": true,
+        "default": "http(s)://192.168.xxx.xxx"
       }
     }
   }

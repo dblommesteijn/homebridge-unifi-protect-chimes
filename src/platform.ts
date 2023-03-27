@@ -134,7 +134,7 @@ export class HomebridgeUnifiProtectChimes implements DynamicPlatformPlugin {
 
   async discoverDevices() {
     const chimes = await this.chimes();
-    for( const chime of chimes) {
+    for(const chime of chimes) {
       const uuid = this.api.hap.uuid.generate('chime_' + chime.id);
       const existingAccessory = this.accessories.find(accessory => accessory.UUID === uuid);
       if (existingAccessory) {
